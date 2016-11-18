@@ -19,9 +19,9 @@ httpGet(Object.assign({}, options, {method: "HEAD"}))
   return httpGet(Object.assign({}, options, {path: getPathFromLinkHeader(resp.headers.link, "last")}));
 })
 .then(iteratePrevPages)
-.then((result)=>{console.log(result);})
+.then((result)=>{console.log(JSON.stringify(result, null, 2));})
 .catch((err)=>{
-  require("util").inspect(err);
+  throw Error(err);
 });
 
 function httpGet(options) {
@@ -37,7 +37,7 @@ function httpGet(options) {
 
       resp.on("data", data=>respText+=data.toString());
       resp.on("end", ()=>{res({headers: resp.headers, data: respText});});
-      resp.on("error", (e)=>{require("util").inspect(e);});
+      resp.on("error", (e)=>{throw Error(e);});
     });
   });
 }
@@ -47,36 +47,39 @@ function getPathFromLinkHeader(link, page) {
   //'<https://api.github.com/user/1511535/events/public?page=2>; rel="next", <https://api.github.com/user/1511535/events/public?page=10>; rel="last"';
 }
 
-function iteratePrevPages(resp, commitCount = 0, firstDate = new Date(), lastDate = new Date(0)) {
-  let dataResult = parseAPIData(resp.data);
-  commitCount += dataResult.commitCount;
-  lastDate = dataResult.lastDate;
-  firstDate = dataResult.firstDate;
+function iteratePrevPages(apiResponse, commitCount = 0, firstDate = new Date(), lastDate = new Date(0)) {
+  let pushEvents = extractRecentPushEvents(apiResponse.data);
+  commitCount += calculateCommitCount(pushEvents);
+  [firstDate, lastDate] = updateFirstLastDates(pushEvents, firstDate, lastDate);
 
-  if (resp.headers.link.includes('rel="prev"')) {
-    return httpGet(Object.assign({}, options, {path: getPathFromLinkHeader(resp.headers.link, "prev")}))
-    .then((resp)=>iteratePrevPages(resp, commitCount, firstDate, lastDate));
-  } else {
+  if (!apiResponse.headers.link.includes('rel="prev"')) {
     return {commitCount, firstDate, lastDate};
   }
+
+  return httpGet(Object.assign({}, options, {
+    path: getPathFromLinkHeader(apiResponse.headers.link, "prev")
+  }))
+  .then((resp)=>iteratePrevPages(resp, commitCount, firstDate, lastDate));
 }
 
-function parseAPIData(data, firstDate, lastDate) {
+function extractRecentPushEvents(data) {
   if (!data) {throw Error("no data");}
   data = JSON.parse(data);
   if (!data.length) {throw Error("invalid data");}
 
-  data = data.filter(e=>e.type === "PushEvent" && (new Date(e.created_at) >= tenDaysAgo));
-  //data.forEach(e=>console.log(e.created_at, e.type));
+  return data.filter(e=>e.type === "PushEvent" && (new Date(e.created_at) >= tenDaysAgo));
+}
+
+function updateFirstLastDates(data, firstDate, lastDate) {
   data.forEach((e)=>{
     let eventCreated = new Date(e.created_at);
-    firstDate = firstDate < eventCreated ? firstDate : eventCreated;
-    lastDate = lastDate > eventCreated ? lastDate : eventCreated;
+    firstDate = eventCreated < firstDate ? eventCreated : firstDate;
+    lastDate = eventCreated > lastDate ? eventCreated : lastDate;
   });
 
-  return {
-    commitCount: data.reduce((sum, el)=>sum + el.payload.distinct_size, 0),
-    firstDate,
-    lastDate
-  };
+  return [firstDate, lastDate];
+}
+
+function calculateCommitCount(data) {
+  return data.reduce((sum, el)=>sum + el.payload.distinct_size, 0);
 }
