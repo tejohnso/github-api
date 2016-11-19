@@ -17,4 +17,4 @@ module.exports = function fetchDataAndHeaders(options) {
       resp.on("error", (e)=>{throw Error(e);});
     });
   });
-}
+};

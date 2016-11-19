@@ -1,0 +1,8 @@
+{
+  "hostname": "api.github.com",
+  "path": "/users/tejohnso/events/public",
+  "headers": {
+    "user-agent": "nodejs",
+    "accept": "application/vnd.github.v3+json"
+  }
+}

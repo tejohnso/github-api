@@ -1,18 +1,10 @@
 const fetchDataAndHeaders = require("./fetch-data-and-headers.js");
 const url = require("url");
 const tenDaysAgo = Date.now() - 1000 * 60 * 60 * 24 * 10;
+const options = require("./options.json");
+const tok = process.env.GITHUB_TOKEN;
 
-const options = {
-  hostname: "api.github.com",
-  path: "/users/tejohnso/events/public",
-  headers: {
-    "Authorization": "token " + process.env.GITHUB_TOKEN,
-    "user-agent": "nodejs",
-    "accept": "application/vnd.github.v3+json"
-  }
-};
-
-if (!process.env.GITHUB_TOKEN) {delete options.headers.Authorization;}
+if (tok) options.headers.Authorization = "token " + tok;
 
 fetchDataAndHeaders(Object.assign({}, options, {method: "HEAD"}))
 .then(function lastPageFromHeadRequest(resp) {
