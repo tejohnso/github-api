@@ -1,4 +1,4 @@
-const https = require("https");
+const fetchDataAndHeaders = require("./fetch-data-and-headers.js");
 const url = require("url");
 const tenDaysAgo = Date.now() - 1000 * 60 * 60 * 24 * 10;
 
@@ -14,34 +14,15 @@ const options = {
 
 if (!process.env.GITHUB_TOKEN) {delete options.headers.Authorization;}
 
-httpGet(Object.assign({}, options, {method: "HEAD"}))
+fetchDataAndHeaders(Object.assign({}, options, {method: "HEAD"}))
 .then(function lastPageFromHeadRequest(resp) {
-  return httpGet(Object.assign({}, options, {path: getPathFromLinkHeader(resp.headers.link, "last")}));
+  return fetchDataAndHeaders(Object.assign({}, options, {path: getPathFromLinkHeader(resp.headers.link, "last")}));
 })
 .then(iteratePrevPages)
 .then((result)=>{console.log(JSON.stringify(result, null, 2));})
 .catch((err)=>{
   throw Error(err);
 });
-
-function httpGet(options) {
-  return new Promise((res, rej)=>{
-    console.log("fetching " + options.path);
-    https.get((options), (resp)=>{
-      let respText = "";
-
-      if (resp.statusCode !== 200) {
-        console.log(resp.headers);
-        throw Error("HTTP Error: " + resp.statusCode);
-      }
-
-      resp.setEncoding("utf8");
-      resp.on("data", data=>respText+=data);
-      resp.on("end", ()=>{res({headers: resp.headers, data: respText});});
-      resp.on("error", (e)=>{throw Error(e);});
-    });
-  });
-}
 
 function getPathFromLinkHeader(link, page) {
   return url.parse(link.split(", ").map(e=>e.split("; ")).filter(e=>e[1]===`rel="${page}"`)[0][0].slice(1, -1)).path;
@@ -57,7 +38,7 @@ function iteratePrevPages(apiResponse, commitCount = 0, firstDate = new Date(), 
     return {commitCount, firstDate, lastDate};
   }
 
-  return httpGet(Object.assign({}, options, {
+  return fetchDataAndHeaders(Object.assign({}, options, {
     path: getPathFromLinkHeader(apiResponse.headers.link, "prev")
   }))
   .then((resp)=>iteratePrevPages(resp, commitCount, firstDate, lastDate));
