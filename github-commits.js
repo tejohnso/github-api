@@ -35,7 +35,8 @@ function httpGet(options) {
         throw Error("HTTP Error: " + resp.statusCode);
       }
 
-      resp.on("data", data=>respText+=data.toString());
+      resp.setEncoding("utf8");
+      resp.on("data", data=>respText+=data);
       resp.on("end", ()=>{res({headers: resp.headers, data: respText});});
       resp.on("error", (e)=>{throw Error(e);});
     });
